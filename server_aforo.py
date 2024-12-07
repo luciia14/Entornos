@@ -15,7 +15,7 @@ df['Estado'] = df['Estado'].fillna('Desconocido')  # Rellenar valores faltantes
 
 # Crear el servidor OPC UA
 servidor = Server()
-servidor.set_endpoint("opc.tcp://localhost:4840/es/upv/epsa/entornos/estacion_aforo/")
+servidor.set_endpoint("opc.tcp://localhost:4842/es/upv/epsa/entornos/bla/estacion_aforo/")
 
 uri = "http://www.epsa.upv.es/entornos"
 
@@ -44,7 +44,7 @@ async def main():
     caudal, estado, hora_variable = await iniciar_servidor()
 
     # Simular conexión al servidor temporal para la hora simulada
-    url_servidor_temporal = "opc.tcp://localhost:4841/freeopcua/server/"
+    url_servidor_temporal = "opc.tcp://localhost:4840/freeopcua/server/"
     cliente_temporal = Client(url_servidor_temporal)
     await cliente_temporal.connect()
 
@@ -80,4 +80,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
