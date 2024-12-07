@@ -3,66 +3,72 @@ import pandas as pd
 import math
 from asyncua.sync import Server
 
-# Ruta del archivo Excel
-archivo_excel = r"/home/lucy/openc_ua/PluviómetroChiva_29octubre2024.xlsx"
+def leer_datos_excel(ruta_archivo, columnas, fila_inicio, filas_leer):
+    """Lee las columnas especificadas desde un archivo Excel, omitiendo filas iniciales."""
+    return pd.read_excel(
+        ruta_archivo,
+        usecols=columnas,
+        skiprows=fila_inicio,
+        nrows=filas_leer,
+        engine='openpyxl'
+    )
 
-# Leer las columnas A (hora) y B (precipitaciones) desde la fila 8
-# Usar índices 0 y 1 para seleccionar las columnas correspondientes
-df = pd.read_excel(archivo_excel, usecols=[0, 1], skiprows=7, nrows=289, engine='openpyxl')
+def procesar_precipitaciones(datos_precipitaciones):
+    """Procesa la lista de precipitaciones redondeándolas hacia arriba a un decimal."""
+    return [round(math.ceil(valor * 10) / 10, 1) for valor in pd.to_numeric(datos_precipitaciones, errors='coerce').dropna()]
 
-# Convertir la columna B (precipitaciones) en una lista de valores numéricos
-precipitaciones_lista = pd.to_numeric(df.iloc[:, 1], errors='coerce').dropna().tolist()
+def configurar_servidor_opc(endpoint, uri):
+    """Configura y devuelve un servidor OPC UA listo para usar."""
+    servidor = Server()
+    servidor.set_endpoint(endpoint)
+    idx = servidor.register_namespace(uri)
+    pluviometro = servidor.nodes.objects.add_object(idx, "Pluviometro")
+    return servidor, idx, pluviometro
 
-# Redondear los valores de precipitaciones hacia arriba y mantener solo un decimal
-precipitaciones_lista = [round(math.ceil(valor * 10) / 10, 1) for valor in precipitaciones_lista]
+def agregar_variables_pluviometro(pluviometro, idx):
+    """Agrega variables al objeto pluviómetro en el servidor OPC."""
+    precipitaciones = pluviometro.add_variable(idx, "Precipitaciones_mm_h", 0.0)
+    precipitaciones.set_writable()
+    hora_variable = pluviometro.add_variable(idx, "Hora", "")
+    hora_variable.set_writable()
+    return precipitaciones, hora_variable
 
-# Crear el servidor OPC UA
-servidor = Server()
-servidor.set_endpoint("opc.tcp://localhost:4840/es/upv/epsa/entornos/pluviometro/")
+def actualizar_datos(servidor, precipitaciones_var, hora_var, datos, intervalo):
+    """Simula actualizaciones de datos en el servidor OPC."""
+    try:
+        for i, (hora, valor) in enumerate(zip(datos.iloc[:, 0], datos.iloc[:, 1])):
+            time.sleep(intervalo)
+            hora = hora.strftime('%H:%M:%S') if isinstance(hora, pd.Timestamp) else str(hora)
+            precipitaciones_var.set_value(valor)
+            hora_var.set_value(hora)
+            print(f"Actualizando precipitaciones a: {valor} mm/h")
+            print(f"Hora actualizada a: {hora}")
+    except KeyboardInterrupt:
+        print("Servidor detenido por el usuario.")
+    finally:
+        servidor.stop()
+        print("Servidor detenido.")
 
-# Registrar un espacio de nombres único para los nodos
-uri = "http://www.epsa.upv.es/entornos"
-idx = servidor.register_namespace(uri)
+if __name__ == "__main__":
+    # Configuración del archivo y lectura de datos
+    archivo_excel = r"/home/bpercam/entornos_trabajo/Pluvi_metroChiva_29octubre2024.xlsx"
+    columnas_a_leer = [0, 1]
+    fila_inicio = 7
+    filas_leer = 289
 
-# Crear un objeto para el pluviómetro
-pluviometro = servidor.nodes.objects.add_object(idx, "Pluviometro")
+    df = leer_datos_excel(archivo_excel, columnas_a_leer, fila_inicio, filas_leer)
+    precipitaciones_lista = procesar_precipitaciones(df.iloc[:, 1])
+    df.iloc[:, 1] = precipitaciones_lista
 
-# Crear una variable para representar las precipitaciones en mm/h
-precipitaciones = pluviometro.add_variable(idx, "Precipitaciones_mm_h", 0.0)  # Valor inicial 0.0
-precipitaciones.set_writable()  # Permitir que los clientes modifiquen el valor
+    # Configuración del servidor OPC UA
+    endpoint = "opc.tcp://localhost:4840/es/upv/epsa/entornos/pluviometro/"
+    uri = "http://www.epsa.upv.es/entornos"
+    servidor, idx, pluviometro = configurar_servidor_opc(endpoint, uri)
 
-# Crear una variable para representar la hora
-hora_variable = pluviometro.add_variable(idx, "Hora", "")  # Valor inicial vacío
-hora_variable.set_writable()  # Permitir que los clientes modifiquen el valor
+    precipitaciones_var, hora_var = agregar_variables_pluviometro(pluviometro, idx)
 
-# Iniciar el servidor
-servidor.start()
-print("Servidor OPC UA del Pluviómetro iniciado en:")
-print("opc.tcp://0.0.0.0:4840/es/upv/epsa/entornos/pluviometro/")
-
-try:
-    # Simular actualizaciones de precipitaciones y hora
-    for i, valor in enumerate(precipitaciones_lista):
-        time.sleep(1)  # Actualizar cada segundo
-        
-        # Leer la hora de la columna A correspondiente
-        hora = df.iloc[i, 0]  # Obtener la hora de la fila actual
-        
-        # Convertir la hora a formato string si es necesario
-        if isinstance(hora, pd.Timestamp):
-            hora = hora.strftime('%H:%M:%S')  # Formato hora: HH:MM:SS
-        else:
-            hora = str(hora)  # En caso de que la hora ya esté como string
-
-        # Asignar los valores al servidor
-        precipitaciones.set_value(valor)  # Asignar el valor de precipitaciones desde la lista
-        hora_variable.set_value(hora)  # Asignar el valor de la hora correspondiente
-        
-        print(f"Actualizando precipitaciones a: {valor} mm/h")
-        print(f"Hora actualizada a: {hora}")
-except KeyboardInterrupt:
-    print("Servidor detenido.")
-finally:
-    servidor.stop()
-
+    # Iniciar el servidor y actualizar datos
+    servidor.start()
+    print(f"Servidor OPC UA iniciado en: {endpoint}")
+    actualizar_datos(servidor, precipitaciones_var, hora_var, df, intervalo=1)
 
