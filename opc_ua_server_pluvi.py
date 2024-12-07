@@ -18,7 +18,7 @@ precipitaciones_lista = [round(math.ceil(valor * 10) / 10, 1) for valor in preci
 
 # Crear el servidor OPC UA para el pluviómetro
 servidor = Server()
-servidor.set_endpoint("opc.tcp://localhost:4842/es/upv/epsa/entornos/pluviometro/")
+servidor.set_endpoint("opc.tcp://localhost:4841/es/upv/epsa/entornos/bla/pluviometro/")
 
 # Registrar un espacio de nombres único para los nodos
 uri = "http://www.epsa.upv.es/entornos"
@@ -45,7 +45,7 @@ async def iniciar_servidor():
     return precipitaciones, hora_variable
 
 # URL del servidor temporal al cual nos conectaremos como cliente
-url_servidor_temporal = "opc.tcp://localhost:4841/freeopcua/server/"
+url_servidor_temporal = "opc.tcp://localhost:4840/es/upv/epsa/entornos/bla/temporal/"
 
 # Conectar como cliente al servidor temporal
 async def main():
@@ -111,6 +111,9 @@ async def main():
 # Ejecutar la función principal
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+
 
 
 
