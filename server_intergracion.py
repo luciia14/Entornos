@@ -10,9 +10,9 @@ def obtener_nodo_por_nombre(nodo, nombre_nodo):
     raise Exception(f"Nodo '{nombre_nodo}' no encontrado en el objeto.")
 
 # Conexión a los servidores
-pluvio_client = Client("opc.tcp://localhost:4840/es/upv/epsa/entornos/pluviometro/")
-aforo_client = Client("opc.tcp://localhost:4843/es/upv/epsa/entornos/estacion_aforo/")
-temporal_client = Client("opc.tcp://localhost:4841/freeopcua/server/")
+pluvio_client = Client("opc.tcp://localhost:4841/es/upv/epsa/entornos/bla/pluviometro/")
+aforo_client = Client("opc.tcp://localhost:4842/es/upv/epsa/entornos/bla/estacion_aforo/")
+temporal_client = Client("opc.tcp://localhost:4840/es/upv/epsa/entornos/bla/temporal/")
 
 pluvio_client.connect()
 aforo_client.connect()
@@ -48,13 +48,36 @@ try:
         # Leer el valor del nodo de precipitaciones
         prec = nodo_precipitaciones.get_value()
         
-        # Simulación de datos
+        # Obtener caudal desde el servidor de aforo
+        aforo_obj = aforo_client.get_node("ns=2;i=1")  # Nodo Estación de Aforo
+        print("Explorando hijos del nodo 'Estación de Aforo'...")
+        nodo_caudal = obtener_nodo_por_nombre(aforo_obj, "Caudal_m3_s")
+        
+        # Leer el valor del nodo de caudal
+        caudal_valor = nodo_caudal.get_value()
+        
+        # Obtener hora simulada del servidor temporal
+        hora_simulada_node = temporal_client.get_node("ns=2;i=2")  # Ajustar 'ns' e 'i' según el servidor temporal
+        hora_simulada_g= hora_simulada_node.get_value()
+        hora_simulada_value = hora_simulada_g.strftime('%Y-%m-%d %H:%M:%S')
+        # Establecer los valores en el servidor de integración
         precipitaciones.set_value(prec)
-        print(f"Precipitaciones actuales: {prec}")
-
+        caudal.set_value(caudal_valor)
+        hora_simulada.set_value(hora_simulada_value)
+        
+        print(f"Precipitaciones actuales: {prec} mm/h")
+        print(f"Caudal actual: {caudal_valor} m³/s")
+        print(f"Hora simulada: {hora_simulada_value}")
+        
+        # Simulación de cálculo de estado de alerta
+        estado_alerta_value = prec > 50 or caudal_valor > 150  # Activar alerta si las precipitaciones son mayores a 50 mm/h
+        estado_alerta.set_value(estado_alerta_value)
+        print(f"Estado de alerta: {'Activado' if estado_alerta_value else 'Desactivado'}")
+        
 except KeyboardInterrupt:
     print("Servidor detenido.")
 finally:
+    # Desconectar clientes y detener servidor
     pluvio_client.disconnect()
     aforo_client.disconnect()
     temporal_client.disconnect()
