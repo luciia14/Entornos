@@ -2,14 +2,12 @@ import pandas as pd
 import asyncio
 from asyncua import Server, Client
 
-# Configuración del archivo y servidor
 ARCHIVO_CSV = "/home/alopalm/entornos/trabajo_final/cincominutales-rambla-poyo-29102024.csv"
 ENDPOINT_OPC_UA = "opc.tcp://localhost:4842/es/upv/epsa/entornos/bla/estacion_aforo/"
 URI = "http://www.epsa.upv.es/entornos"
 URL_SERVIDOR_TEMPORAL = "opc.tcp://localhost:4840/freeopcua/server/"
 
 def cargar_datos_csv(ruta_csv):
-    """Carga y prepara los datos del archivo CSV."""
     df = pd.read_csv(ruta_csv)
     df['Caudal'] = df['Caudal'].replace(',', '.', regex=True)
     df['Caudal'] = pd.to_numeric(df['Caudal'], errors='coerce')
@@ -17,7 +15,6 @@ def cargar_datos_csv(ruta_csv):
     return df
 
 async def configurar_servidor(endpoint, uri):
-    """Configura y devuelve un servidor OPC UA."""
     servidor = Server()
     await servidor.init()
     servidor.set_endpoint(endpoint)
@@ -35,13 +32,11 @@ async def configurar_servidor(endpoint, uri):
     return servidor, caudal, estado, hora_variable
 
 async def leer_hora_simulada(cliente):
-    """Lee la hora simulada desde el servidor temporal."""
     nodo_hora_simulada = cliente.get_node("ns=2;i=2")
     hora_simulada = await nodo_hora_simulada.read_value()
     return pd.to_datetime(hora_simulada)
 
 async def actualizar_variables(caudal_var, estado_var, hora_var, df, hora_simulada):
-    """Actualiza las variables del servidor OPC UA con los datos correspondientes."""
     fila = df[df['Fecha'] == hora_simulada.strftime('%Y-%m-%d %H:%M:%S')]
     if not fila.empty:
         caudal_valor = fila['Caudal'].iloc[0]
@@ -56,16 +51,12 @@ async def actualizar_variables(caudal_var, estado_var, hora_var, df, hora_simula
         print(f"No se encontraron datos para la hora simulada: {hora_simulada}")
 
 async def main():
-    """Función principal para ejecutar el servidor OPC UA."""
-    # Cargar y preparar los datos
     df = cargar_datos_csv(ARCHIVO_CSV)
 
-    # Configurar servidor OPC UA
     servidor, caudal_var, estado_var, hora_var = await configurar_servidor(ENDPOINT_OPC_UA, URI)
     await servidor.start()
     print(f"Servidor OPC UA iniciado en: {servidor.endpoint}")
 
-    # Conectar al servidor temporal
     cliente_temporal = Client(URL_SERVIDOR_TEMPORAL)
     await cliente_temporal.connect()
 
