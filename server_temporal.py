@@ -1,76 +1,106 @@
 import asyncio
-from asyncua import Server
-from datetime import datetime, timedelta
+from asyncua import Server, ua
+from datetime import datetime, timedelta, timezone
+import os
 
-# Función principal para ejecutar el servidor OPC UA
+
+class SubscriptionHandler:
+    def __init__(self, hora_simulada, velocidad_simulada):
+        self.hora_simulada = hora_simulada
+        self.velocidad_simulada = velocidad_simulada
+        self.hora_actual = datetime(2024, 11, 28, 4, 0, 0, tzinfo=timezone.utc)  # Hora inicial en UTC
+        self.velocidad_actual = 1
+
+    async def datachange_notification(self, node, val, data):
+        """Se ejecuta cuando un cliente modifica las variables."""
+        if node == self.hora_simulada:
+            try:
+                # Validar y asignar la hora modificada
+                if isinstance(val, datetime):
+                    self.hora_actual = val
+                else:
+                    self.hora_actual = datetime.strptime(val, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                print(f"Hora simulada modificada por cliente: {self.hora_actual}")
+            except Exception as e:
+                print(f"Error al interpretar la hora modificada: {e}")
+        elif node == self.velocidad_simulada:
+            self.velocidad_actual = max(val, 0.1)  # Prevenir división por 0
+            print(f"Velocidad simulada modificada por cliente: {self.velocidad_actual}")
+
+    async def actualizar_hora(self):
+        """Incrementa la hora simulada automáticamente según la velocidad."""
+        while True:
+            try:
+                # Incrementar la hora simulada
+                self.hora_actual += timedelta(minutes=5)
+                await self.hora_simulada.write_value(self.hora_actual)
+                print(f"Hora simulada actualizada: {self.hora_actual.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
+                # Ajustar el tiempo de espera según la velocidad actual
+                await asyncio.sleep(1 / self.velocidad_actual)
+            except Exception as e:
+                print(f"Error al actualizar la hora simulada: {e}")
+
+
 async def main():
-    # Pedir la fecha y hora de inicio al usuario
-    fecha_hora_str = input("Introduce la fecha y hora de inicio de la simulación (formato DD/MM/YYYY HH:MM:SS): ")
-    try:
-        # Convertir la fecha y hora de inicio en un objeto datetime
-        hora_inicio = datetime.strptime(fecha_hora_str, "%d/%m/%Y %H:%M:%S")
-    except ValueError:
-        print("Formato de fecha y hora inválido. Usando la fecha y hora actual como valor predeterminado.")
-        hora_inicio = datetime.now().replace(second=0, microsecond=0)  # Usar la fecha y hora actual si el formato es incorrecto
-
-    print(f"Hora de inicio de la simulación: {hora_inicio}")
-
-    # Pedir la velocidad de simulación (número de minutos de simulación por cada minuto real)
-    velocidad_str = input("Introduce la velocidad de simulación (número de minutos simulados por minuto real): ")
-    try:
-        velocidad = int(velocidad_str)
-    except ValueError:
-        print("Valor inválido para la velocidad. Usando velocidad 1 por defecto.")
-        velocidad = 1  # Si la entrada no es válida, usar velocidad 1 como predeterminado
-
     # Crear el servidor OPC UA
     servidor = Server()
-    await servidor.init()  # Inicializar el servidor correctamente
-    servidor.set_endpoint("opc.tcp://localhost:4841/freeopcua/server/")
+    await servidor.init()
+    servidor.set_endpoint("opc.tcp://localhost:4840/entornos/bla/temporal/")
 
-    # Definir el URI y registrar el espacio de nombres
-    uri = "http://www.epsa.upv.es/entornos/temporal"
+    uri = "http://www.epsa.upv.es/entornos/bla/temporal"
     idx = await servidor.register_namespace(uri)
 
-    # Crear el objeto en el espacio de nombres
-    mi_obj = await servidor.nodes.objects.add_object(idx, "HoraSimulada")
+    # Importar el archivo XML
+    try:
+        print("Comprobando si el archivo XML existe:", os.path.isfile("trabajo_final.xml"))
+        await servidor.import_xml("nodo_hora.xml")
+        print("Archivo XML importado correctamente")
+    except Exception as e:
+        print(f"Error al importar el archivo XML: {e}")
+        return
 
-    # Crear la variable dentro del objeto para almacenar la hora simulada
-    hora_simulada = await mi_obj.add_variable(idx, "HoraSimulada", hora_inicio)
+    # Verificar nodos importados
+    print("\nVerificando nodos importados:")
+    try:
+        # Obtener el nodo ObjetoTemporal
+        nodo_objeto_temporal = await servidor.nodes.objects.get_child([f"{idx}:ObjetoTemporal"])
 
-    # Hacer la variable escribible (aunque no la modificaremos desde fuera)
+        # Obtener las variables hijo
+        hora_simulada = await nodo_objeto_temporal.get_child([f"{idx}:HoraSimulada"])
+        velocidad_simulada = await nodo_objeto_temporal.get_child([f"{idx}:VelocidadSimulacion"])
+
+        print(f"Nodo ObjetoTemporal encontrado: {nodo_objeto_temporal}")
+        print(f"Nodo HoraSimulada encontrado: {hora_simulada}")
+        print(f"Nodo VelocidadSimulada encontrado: {velocidad_simulada}")
+    except Exception as e:
+        print(f"Error al verificar nodos importados: {e}")
+        return
+
+    # Configurar variables como escribibles
     await hora_simulada.set_writable()
+    
+    await velocidad_simulada.set_writable()
+
+    # Crear manejador y suscripciones
+    handler = SubscriptionHandler(hora_simulada, velocidad_simulada)
+    subscription = await servidor.create_subscription(100, handler)
+    await subscription.subscribe_data_change(hora_simulada)
+    await subscription.subscribe_data_change(velocidad_simulada)
 
     # Iniciar el servidor
     await servidor.start()
     print(f"Servidor OPC UA iniciado en {servidor.endpoint}")
 
+    # Ejecutar el actualizador de hora en un bucle asincrónico
     try:
-        # Inicializar la hora simulada
-        hora_actual = hora_inicio
-
-        while True:
-            # Incrementar la hora simulada según la velocidad especificada (en intervalos de 5 minutos)
-            hora_actual += timedelta(minutes=5 * velocidad)
-
-            # Escribir el nuevo valor en la variable
-            await hora_simulada.write_value(hora_actual)
-
-            # Imprimir la hora simulada en consola
-            print(f"Hora simulada: {hora_actual.strftime('%Y-%m-%d %H:%M:%S')}")
-
-            # Esperar 1 segundo en tiempo real antes de actualizar la hora simulada
-            await asyncio.sleep(1)
-
-    except Exception as e:
-        print(f"Ocurrió un error: {e}")
-
+        await handler.actualizar_hora()
     finally:
-        # Detener el servidor cuando se interrumpe el ciclo
         await servidor.stop()
         print("Servidor detenido")
 
-# Ejecutar la función principal
+
 if __name__ == "__main__":
     asyncio.run(main())
+
 
