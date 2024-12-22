@@ -13,8 +13,24 @@ TEMPORAL_URL = "opc.tcp://localhost:4840/es/upv/epsa/entornos/bla/temporal/"
 INTEGRACION_URL = "opc.tcp://localhost:4850/integracion/"
 
 class SubscriptionHandler:
-    def __init__(self, server_vars):
+    def __init__(self, server_vars, servidor):
         self.server_vars = server_vars
+        self.servidor = servidor
+        self.last_alert_state = False
+
+    async def trigger_alert_event(self, precipitaciones_hora, caudal, estado_alerta):
+        # Crear y configurar un evento personalizado
+        event_generator = await self.servidor.get_event_generator(self.server_vars["alerta_event_type"], self.server_vars["integracion"])
+        event_generator.event.Message = ua.LocalizedText(f"Estado de alerta {'activado' if estado_alerta else 'desactivado'}")
+        event_generator.event.Severity = 100 if estado_alerta else 0
+        event_generator.event.Time = datetime.now(timezone.utc)
+        event_generator.event.Precipitaciones = precipitaciones_hora
+        event_generator.event.Caudal = caudal
+        event_generator.event.Estado = estado_alerta
+
+        # Emitir el evento
+        await event_generator.trigger()
+        _logger.info(f"Evento emitido: Estado de alerta {'activado' if estado_alerta else 'desactivado'}.")
 
     async def datachange_notification(self, node, val, data):
         _logger.info(f"DataChange en nodo {node}, nuevo valor: {val}")
@@ -30,8 +46,12 @@ class SubscriptionHandler:
         precipitaciones_hora = await self.server_vars["integracion_precipitaciones_hora"].read_value()
         caudal = await self.server_vars["integracion_caudal"].read_value()
         estado_alerta = precipitaciones_hora > 50 and caudal > 150
-        await self.server_vars["integracion_estado_alerta"].write_value(estado_alerta)
-        _logger.info(f"Estado de alerta actualizado: {'Activado' if estado_alerta else 'Desactivado'}")
+
+        # Emitir evento si cambia el estado de alerta
+        if estado_alerta != self.last_alert_state:
+            await self.trigger_alert_event(precipitaciones_hora, caudal, estado_alerta)
+            self.last_alert_state = estado_alerta
+
 
 async def main():
     # Crear servidor integrado
@@ -57,14 +77,9 @@ async def main():
         precipitaciones_mm_h = await integracion.get_child([f"{idx}:Precipitaciones_mm_h"])
         caudal = await integracion.get_child([f"{idx}:Caudal_m3_s"])
         hora_simulada = await integracion.get_child([f"{idx}:HoraSimulada"])
-        estado_alerta = await integracion.get_child([f"{idx}:EstadoAlerta"])
+        alerta_event_type = servidor.get_node(f"ns={idx};i=5000")  # Tipo de evento importado del XML
 
-        _logger.info(f"Nodo Integracion encontrado: {integracion}")
-        _logger.info(f"Nodo Precipitaciones encontrado: {precipitaciones}")
-        _logger.info(f"Nodo Precipitaciones_mm_h encontrado: {precipitaciones_mm_h}")
-        _logger.info(f"Nodo Caudal encontrado: {caudal}")
-        _logger.info(f"Nodo HoraSimulada encontrado: {hora_simulada}")
-        _logger.info(f"Nodo EstadoAlerta encontrado: {estado_alerta}")
+        _logger.info("Nodos obtenidos correctamente del XML.")
     except Exception as e:
         _logger.error(f"Error al obtener nodos del XML: {e}")
         return
@@ -83,15 +98,7 @@ async def main():
         try:
             pluviometro_precipitaciones = pluviometro_client.get_node("ns=2;s=Precipitaciones")
             pluviometro_precipitaciones_hora = pluviometro_client.get_node("ns=2;s=Precipitaciones_mm_h")
-            aforo_caudal = aforo_client.get_node("ns=2;i=2")  # Reemplaza esto con el NodeId correcto
-
-            try:
-                browse_name = await aforo_caudal.read_browse_name()
-                _logger.info(f"Nodo Caudal encontrado: {browse_name}")
-            except Exception as e:
-                _logger.error(f"Error al verificar el nodo 'aforo_caudal': {e}")
-                return
-
+            aforo_caudal = aforo_client.get_node("ns=2;i=2")
             temporal_hora_simulada = temporal_client.get_node("ns=2;s=HoraSimulada")
 
             _logger.info("Nodos del servidor de origen obtenidos correctamente.")
@@ -109,9 +116,10 @@ async def main():
             "integracion_precipitaciones_hora": precipitaciones_mm_h,
             "integracion_caudal": caudal,
             "integracion_hora_simulada": hora_simulada,
-            "integracion_estado_alerta": estado_alerta,
+            "integracion": integracion,
+            "alerta_event_type": alerta_event_type,
         }
-        handler = SubscriptionHandler(server_vars)
+        handler = SubscriptionHandler(server_vars, servidor)
 
         # Crear suscripciones
         pluviometro_subscription = await pluviometro_client.create_subscription(100, handler)
@@ -133,4 +141,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
+    
