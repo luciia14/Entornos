@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<UANodeSet xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- Espacio de nombres -->
+  <NamespaceUris>
+    <Uri>http://www.epsa.upv.es/entornos/estacion</Uri>
+  </NamespaceUris>
+
+  <!-- Tipo de objeto para la estación de aforo -->
+  <UAObjectType NodeId="ns=2;s=EstacionAforoType" BrowseName="2:EstacionAforoType">
+    <DisplayName>EstacionAforoType</DisplayName>
+    <Description>Tipo de objeto que representa una estación de aforo</Description>
+    <References>
+      <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference> <!-- BaseObjectType -->
+    </References>
+  </UAObjectType>
+
+  <!-- Variable Caudal_m3_s como parte del ObjectType -->
+  <UAVariable NodeId="ns=2;s=EstacionAforoType.Caudal_m3_s" BrowseName="2:Caudal_m3_s" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Caudal_m3_s</DisplayName>
+    <Description>Caudal en metros cúbicos por segundo</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="HasModellingRule">i=78</Reference> <!-- Mandatory -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=EstacionAforoType</Reference>
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+
+  <!-- Variable Estado como parte del ObjectType -->
+  <UAVariable NodeId="ns=2;s=EstacionAforoType.Estado" BrowseName="2:Estado" DataType="String" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Estado</DisplayName>
+    <Description>Estado de la estación de aforo</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="HasModellingRule">i=78</Reference> <!-- Mandatory -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=EstacionAforoType</Reference>
+    </References>
+    <Value>
+      <String>Desconocido</String>
+    </Value>
+  </UAVariable>
+
+  <!-- Variable Hora como parte del ObjectType -->
+  <UAVariable NodeId="ns=2;s=EstacionAforoType.Hora" BrowseName="2:Hora" DataType="DateTime" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Hora</DisplayName>
+    <Description>Hora actual en UTC</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="HasModellingRule">i=78</Reference> <!-- Mandatory -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=EstacionAforoType</Reference>
+    </References>
+    <Value>
+      <DateTime>2024-01-01T00:00:00Z</DateTime>
+    </Value>
+  </UAVariable>
+
+  <!-- Instancia del ObjectType EstacionAforo -->
+  <UAObject NodeId="ns=2;s=EstacionAforo" BrowseName="2:EstacionAforo">
+    <DisplayName>EstacionAforo</DisplayName>
+    <Description>Instancia de la estación de aforo</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">ns=2;s=EstacionAforoType</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference> <!-- Organizado por Objects -->
+    </References>
+  </UAObject>
+</UANodeSet>
