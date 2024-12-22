@@ -1,135 +1,136 @@
 import asyncio
-import math
-import pandas as pd
-from datetime import datetime, timezone, timedelta
-from asyncua import Server, Client, ua
-import numpy as np
+import logging
+from datetime import datetime, timezone
+from asyncua import Client, Server, ua
 
-# Ruta del archivo Excel
-archivo_excel = r"/home/alopalm/entornos/trabajo_final/Pluvi_metroChiva_29octubre2024.xlsx"
+logging.basicConfig(level=logging.INFO)
+_logger = logging.getLogger("integracion")
 
-# Leer las columnas A (hora) y B (precipitaciones) desde la fila 8
-df = pd.read_excel(archivo_excel, usecols=[0, 1], skiprows=7, nrows=289, engine='openpyxl')
-
-# Convertir la columna B (precipitaciones) en una lista de valores numéricos
-precipitaciones_lista = pd.to_numeric(df.iloc[:, 1], errors='coerce').dropna().tolist()
-precipitaciones_lista = [round(math.ceil(valor * 10) / 10, 1) for valor in precipitaciones_lista]
-
-# Crear el servidor OPC UA
-servidor = Server()
-servidor.set_endpoint("opc.tcp://localhost:4841/")
-
-async def registrar_espacio_nombres():
-    uri = "http://www.epsa.upv.es/entornos"
-    return await servidor.register_namespace(uri)
+# Configuración de las URLs de los servidores
+PLUVIOMETRO_URL = "opc.tcp://localhost:4841/es/upv/epsa/entornos/bla/pluviometro/"
+AFORO_URL = "opc.tcp://localhost:4842/es/upv/epsa/entornos/bla/estacion_aforo/"
+TEMPORAL_URL = "opc.tcp://localhost:4840/es/upv/epsa/entornos/bla/temporal/"
+INTEGRACION_URL = "opc.tcp://localhost:4850/integracion/"
 
 class SubscriptionHandler:
-    def __init__(self, precipitaciones, hora_variable, precipitacion_hora):
-        self.precipitaciones = precipitaciones
-        self.hora_variable = hora_variable
-        self.precipitacion_hora = precipitacion_hora
-        self.acumulacion_precipitaciones = 0.0
-        self.ultima_hora_acumulada = None
+    def __init__(self, server_vars):
+        self.server_vars = server_vars
 
     async def datachange_notification(self, node, val, data):
-        """Manejador de cambios de datos."""
-        print(f"Hora simulada recibida: {val}")
-        hora_simulada = val.replace(tzinfo=None)  # Eliminar la zona horaria
+        _logger.info(f"DataChange en nodo {node}, nuevo valor: {val}")
+        if node == self.server_vars["temporal_hora_simulada"]:
+            await self.server_vars["integracion_hora_simulada"].write_value(val)
+        elif node == self.server_vars["pluviometro_precipitaciones"]:
+            await self.server_vars["integracion_precipitaciones"].write_value(val)
+        elif node == self.server_vars["pluviometro_precipitaciones_hora"]:
+            await self.server_vars["integracion_precipitaciones_hora"].write_value(val)
+        elif node == self.server_vars["aforo_caudal"]:
+            await self.server_vars["integracion_caudal"].write_value(val)
 
-        # Buscar el valor de precipitaciones correspondiente
-        encontrado = False
-        for i, fila in df.iterrows():
-            hora_fila = fila.iloc[0]
-            if isinstance(hora_fila, pd.Timestamp):
-                hora_fila = hora_fila.replace(second=0, microsecond=0)
-            else:
-                hora_fila = pd.to_datetime(hora_fila).replace(second=0, microsecond=0)
-
-            if hora_fila == hora_simulada:
-                valor_precipitacion = precipitaciones_lista[i]
-
-                # Actualizar los valores en el servidor
-                await self.precipitaciones.write_value(valor_precipitacion)
-                await self.hora_variable.write_value(val)
-
-                print(f"Actualizando precipitaciones a: {valor_precipitacion} mm/h")
-                print(f"Hora actualizada a: {hora_simulada}")
-
-                # Actualizar acumulación
-                if self.ultima_hora_acumulada is None:
-                    self.ultima_hora_acumulada = hora_simulada
-
-                if hora_simulada - self.ultima_hora_acumulada < timedelta(hours=1):
-                    self.acumulacion_precipitaciones += valor_precipitacion
-                else:
-                    self.acumulacion_precipitaciones = valor_precipitacion
-                    self.ultima_hora_acumulada = hora_simulada
-
-                await self.precipitacion_hora.write_value(round(self.acumulacion_precipitaciones, 1))
-                print(f"Acumulación de precipitaciones: {round(self.acumulacion_precipitaciones, 1)} mm")
-                encontrado = True
-                break
-
-        if not encontrado:
-            # Si no se encuentra coincidencia, enviar valores por defecto
-            await self.precipitaciones.write_value(0.0)
-            await self.precipitacion_hora.write_value(0.0)
-            await self.hora_variable.write_value(val)
-            print("No se encontró coincidencia para la hora simulada. Valores por defecto enviados.")
-
-async def iniciar_servidor():
-    """Configura e inicia el servidor."""
-    await servidor.init()
-    idx = await registrar_espacio_nombres()
-
-    # Crear un objeto para el pluviómetro
-    pluviometro = await servidor.nodes.objects.add_object(idx, "Pluviometro")
-
-    # Crear variables del pluviómetro
-    precipitaciones = await pluviometro.add_variable(idx, "Precipitaciones", 0.0)
-    hora_variable = await pluviometro.add_variable(idx, "Hora", datetime.now(timezone.utc), varianttype=ua.VariantType.DateTime)
-    precipitacion_hora = await pluviometro.add_variable(idx, "Precipitaciones_mm_h", 0.0)
-
-    # Hacer las variables modificables
-    await precipitaciones.set_writable()
-    await hora_variable.set_writable()
-    await precipitacion_hora.set_writable()
-
-    await servidor.start()
-    print("Servidor OPC UA del Pluviómetro iniciado en:", servidor.endpoint)
-
-    return precipitaciones, hora_variable, precipitacion_hora
+        precipitaciones_hora = await self.server_vars["integracion_precipitaciones_hora"].read_value()
+        caudal = await self.server_vars["integracion_caudal"].read_value()
+        estado_alerta = precipitaciones_hora > 50 and caudal > 150
+        await self.server_vars["integracion_estado_alerta"].write_value(estado_alerta)
+        _logger.info(f"Estado de alerta actualizado: {'Activado' if estado_alerta else 'Desactivado'}")
 
 async def main():
-    precipitaciones, hora_variable, precipitacion_hora = await iniciar_servidor()
+    # Crear servidor integrado
+    servidor = Server()
+    servidor.set_endpoint(INTEGRACION_URL)
+    await servidor.init()
+    uri = "http://www.epsa.upv.es/entornos/integracion"
+    idx = await servidor.register_namespace(uri)
 
-    # Conectar al servidor temporal como cliente
-    url_servidor_temporal = "opc.tcp://localhost:4840/"
-    cliente_temporal = Client(url_servidor_temporal)
-
+    # Importar el XML
     try:
-        async with cliente_temporal:
-            print("Conectado al servidor temporal.")
+        _logger.info("Importando archivo XML...")
+        await servidor.import_xml("nodo_integracion.xml")
+        _logger.info("Archivo XML importado correctamente.")
+    except Exception as e:
+        _logger.error(f"Error al importar el archivo XML: {e}")
+        return
 
-            # Obtener el nodo de hora simulada
-            nodo_hora_simulada = cliente_temporal.get_node("ns=2;i=2")
-            print(f"Nodo de hora simulada obtenido: {nodo_hora_simulada}")
+    # Obtener nodos desde el XML importado
+    try:
+        integracion = await servidor.nodes.objects.get_child([f"{idx}:Integracion"])
+        precipitaciones = await integracion.get_child([f"{idx}:Precipitaciones"])
+        precipitaciones_mm_h = await integracion.get_child([f"{idx}:Precipitaciones_mm_h"])
+        caudal = await integracion.get_child([f"{idx}:Caudal_m3_s"])
+        hora_simulada = await integracion.get_child([f"{idx}:HoraSimulada"])
+        estado_alerta = await integracion.get_child([f"{idx}:EstadoAlerta"])
 
-            # Crear manejador de suscripciones
-            handler = SubscriptionHandler(precipitaciones, hora_variable, precipitacion_hora)
+        _logger.info(f"Nodo Integracion encontrado: {integracion}")
+        _logger.info(f"Nodo Precipitaciones encontrado: {precipitaciones}")
+        _logger.info(f"Nodo Precipitaciones_mm_h encontrado: {precipitaciones_mm_h}")
+        _logger.info(f"Nodo Caudal encontrado: {caudal}")
+        _logger.info(f"Nodo HoraSimulada encontrado: {hora_simulada}")
+        _logger.info(f"Nodo EstadoAlerta encontrado: {estado_alerta}")
+    except Exception as e:
+        _logger.error(f"Error al obtener nodos del XML: {e}")
+        return
 
-            # Crear suscripción
-            subscription = await cliente_temporal.create_subscription(100, handler)
-            await subscription.subscribe_data_change(nodo_hora_simulada)
-            await asyncio.Future()  # Mantener el servidor en ejecución
+    await servidor.start()
+    _logger.info(f"Servidor de integración iniciado en {INTEGRACION_URL}")
 
-    except KeyboardInterrupt:
-        print("Servidor detenido.")
-    finally:
-        await cliente_temporal.disconnect()
-        await servidor.stop()
-        print("Servidor del Pluviómetro detenido.")
+    # Conexión a los servidores de origen
+    async with Client(PLUVIOMETRO_URL) as pluviometro_client, \
+               Client(AFORO_URL) as aforo_client, \
+               Client(TEMPORAL_URL) as temporal_client:
 
-# Corre el código solo si es el archivo principal
+        _logger.info("Conectado a los servidores de origen.")
+
+        # Obtener nodos del servidor de origen
+        try:
+            pluviometro_precipitaciones = pluviometro_client.get_node("ns=2;s=Precipitaciones")
+            pluviometro_precipitaciones_hora = pluviometro_client.get_node("ns=2;s=Precipitaciones_mm_h")
+            aforo_caudal = aforo_client.get_node("ns=2;i=2")  # Reemplaza esto con el NodeId correcto
+
+            try:
+                browse_name = await aforo_caudal.read_browse_name()
+                _logger.info(f"Nodo Caudal encontrado: {browse_name}")
+            except Exception as e:
+                _logger.error(f"Error al verificar el nodo 'aforo_caudal': {e}")
+                return
+
+            temporal_hora_simulada = temporal_client.get_node("ns=2;s=HoraSimulada")
+
+            _logger.info("Nodos del servidor de origen obtenidos correctamente.")
+        except Exception as e:
+            _logger.error(f"Error al obtener nodos de los servidores de origen: {e}")
+            return
+
+        # Crear manejador de suscripciones
+        server_vars = {
+            "pluviometro_precipitaciones": pluviometro_precipitaciones,
+            "pluviometro_precipitaciones_hora": pluviometro_precipitaciones_hora,
+            "aforo_caudal": aforo_caudal,
+            "temporal_hora_simulada": temporal_hora_simulada,
+            "integracion_precipitaciones": precipitaciones,
+            "integracion_precipitaciones_hora": precipitaciones_mm_h,
+            "integracion_caudal": caudal,
+            "integracion_hora_simulada": hora_simulada,
+            "integracion_estado_alerta": estado_alerta,
+        }
+        handler = SubscriptionHandler(server_vars)
+
+        # Crear suscripciones
+        pluviometro_subscription = await pluviometro_client.create_subscription(100, handler)
+        aforo_subscription = await aforo_client.create_subscription(100, handler)
+        temporal_subscription = await temporal_client.create_subscription(100, handler)
+
+        # Suscribirse a los nodos
+        await pluviometro_subscription.subscribe_data_change(pluviometro_precipitaciones)
+        await pluviometro_subscription.subscribe_data_change(pluviometro_precipitaciones_hora)
+        await aforo_subscription.subscribe_data_change(aforo_caudal)
+        await temporal_subscription.subscribe_data_change(temporal_hora_simulada)
+
+        # Mantener el servidor activo
+        _logger.info("Esperando actualizaciones desde los servidores de origen...")
+        await asyncio.Future()  # Esperar indefinidamente
+
+    await servidor.stop()
+    _logger.info("Servidor de integración detenido.")
+
 if __name__ == "__main__":
     asyncio.run(main())
+
