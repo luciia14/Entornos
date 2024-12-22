@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<UANodeSet xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <NamespaceUris>
+    <Uri>http://www.epsa.upv.es/entornos/integracion</Uri>
+  </NamespaceUris>
+
+  <!-- Nodo Integracion -->
+  <UAObject NodeId="ns=2;i=4000" BrowseName="2:Integracion">
+    <DisplayName>Integracion</DisplayName>
+    <Description>Nodo principal para integración</Description>
+    <References>
+      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+    </References>
+  </UAObject>
+
+  <!-- Variables -->
+  <UAVariable NodeId="ns=2;i=4001" BrowseName="2:Precipitaciones" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Precipitaciones</DisplayName>
+    <Description>Valor de precipitaciones</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=4000</Reference> <!-- Referencia al nodo Integracion -->
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+
+  <UAVariable NodeId="ns=2;i=4002" BrowseName="2:Precipitaciones_mm_h" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Precipitaciones_mm_h</DisplayName>
+    <Description>Acumulación de precipitaciones</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=4000</Reference> <!-- Referencia al nodo Integracion -->
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+
+  <UAVariable NodeId="ns=2;i=4003" BrowseName="2:Caudal_m3_s" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Caudal_m3_s</DisplayName>
+    <Description>Caudal medido</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=4000</Reference> <!-- Referencia al nodo Integracion -->
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+
+  <UAVariable NodeId="ns=2;i=4004" BrowseName="2:HoraSimulada" DataType="DateTime" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>HoraSimulada</DisplayName>
+    <Description>Hora simulada actual</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=4000</Reference> <!-- Referencia al nodo Integracion -->
+    </References>
+    <Value>
+      <DateTime>2024-01-01T00:00:00Z</DateTime>
+    </Value>
+  </UAVariable>
+
+  <UAVariable NodeId="ns=2;i=4005" BrowseName="2:EstadoAlerta" DataType="Boolean" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>EstadoAlerta</DisplayName>
+    <Description>Estado de alerta</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=4000</Reference> <!-- Referencia al nodo Integracion -->
+    </References>
+    <Value>
+      <Boolean>false</Boolean>
+    </Value>
+  </UAVariable>
+</UANodeSet>
