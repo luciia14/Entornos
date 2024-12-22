@@ -6,53 +6,110 @@
   <NamespaceUris>
     <Uri>http://www.epsa.upv.es/entornos</Uri>
   </NamespaceUris>
-
-  <!-- Objeto principal del pluviómetro -->
-  <UAObject NodeId="ns=2;s=Pluviometro" BrowseName="2:Pluviometro">
-    <DisplayName>Pluviometro</DisplayName>
-    <Description>Objeto que representa el pluviómetro</Description>
+  <!-- Definición del tipo de objeto Pluviómetro -->
+  <UAObjectType NodeId="ns=2;s=PluviometroType" BrowseName="2:PluviometroType">
+    <DisplayName>PluviometroType</DisplayName>
+    <Description>Tipo de objeto que representa un pluviómetro</Description>
     <References>
-      <Reference ReferenceType="HasTypeDefinition">i=58</Reference> <!-- BaseObjectType -->
-      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+      <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference> <!-- BaseObjectType -->
     </References>
-  </UAObject>
-
-  <!-- Variable Precipitaciones -->
-  <UAVariable NodeId="ns=2;s=Precipitaciones" BrowseName="2:Precipitaciones" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+  </UAObjectType>
+  <!-- Variable Precipitaciones (con unidades de ingeniería) -->
+  <UAVariable NodeId="ns=2;s=Pluviometro.Precipitaciones" BrowseName="2:Precipitaciones" DataType="Double" AccessLevel="3" UserAccessLevel="3" ParentNodeId="ns=2;s=Pluviometro">
     <DisplayName>Precipitaciones</DisplayName>
     <Description>Valor actual de precipitaciones en mm/h</Description>
     <References>
       <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
-      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
+      <Reference ReferenceType="HasProperty">ns=2;s=Pluviometro.Precipitaciones.EngineeringUnits</Reference>
     </References>
     <Value>
       <Double>0.0</Double>
     </Value>
   </UAVariable>
-
+  <!-- Propiedad de Unidades de Ingeniería para Precipitaciones -->
+  <UAVariable NodeId="ns=2;s=Pluviometro.Precipitaciones.EngineeringUnits" BrowseName="2:EngineeringUnits" DataType="EUInformation" AccessLevel="1" UserAccessLevel="1" ParentNodeId="ns=2;s=Pluviometro.Precipitaciones">
+    <DisplayName>EngineeringUnits</DisplayName>
+    <Description>Unidades de las precipitaciones</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=68</Reference> <!-- PropertyType -->
+    </References>
+    <Value>
+      <ExtensionObject>
+        <TypeId>
+          <Identifier>i=887</Identifier>
+        </TypeId>
+        <Body>
+          <EUInformation xmlns="http://opcfoundation.org/UA/2008/02/Types.xsd">
+            <NamespaceUri>http://www.opcfoundation.org/UA/units/un/cefact</NamespaceUri>
+            <UnitId>4408652</UnitId> <!-- Código UN/CEFACT para mm/h -->
+            <DisplayName>
+              <Text>mm/h</Text>
+            </DisplayName>
+            <Description>
+              <Text>Milímetros por hora</Text>
+            </Description>
+          </EUInformation>
+        </Body>
+      </ExtensionObject>
+    </Value>
+  </UAVariable>
   <!-- Variable Hora -->
-  <UAVariable NodeId="ns=2;s=Hora" BrowseName="2:Hora" DataType="DateTime" AccessLevel="3" UserAccessLevel="3">
+  <UAVariable NodeId="ns=2;s=Pluviometro.Hora" BrowseName="2:Hora" DataType="DateTime" AccessLevel="3" UserAccessLevel="3" ParentNodeId="ns=2;s=Pluviometro">
     <DisplayName>Hora</DisplayName>
     <Description>Hora actual simulada</Description>
     <References>
       <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
-      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
     </References>
     <Value>
       <DateTime>2024-01-01T00:00:00Z</DateTime>
     </Value>
   </UAVariable>
-
-  <!-- Variable Precipitaciones_mm_h -->
-  <UAVariable NodeId="ns=2;s=Precipitaciones_mm_h" BrowseName="2:Precipitaciones_mm_h" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+  <!-- Nueva Variable: Precipitaciones_mm_h (Acumulación) -->
+  <UAVariable NodeId="ns=2;s=Pluviometro.Precipitaciones_mm_h" BrowseName="2:Precipitaciones_mm_h" DataType="Double" AccessLevel="3" UserAccessLevel="3" ParentNodeId="ns=2;s=Pluviometro">
     <DisplayName>Precipitaciones_mm_h</DisplayName>
-    <Description>Acumulación de precipitaciones en mm</Description>
+    <Description>Acumulación de precipitaciones en la última hora en mm</Description>
     <References>
       <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
-      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
+      <Reference ReferenceType="HasProperty">ns=2;s=Pluviometro.Precipitaciones_mm_h.EngineeringUnits</Reference>
     </References>
     <Value>
       <Double>0.0</Double>
     </Value>
   </UAVariable>
+  <!-- Propiedad de Unidades de Ingeniería para Precipitaciones_mm_h -->
+  <UAVariable NodeId="ns=2;s=Pluviometro.Precipitaciones_mm_h.EngineeringUnits" BrowseName="2:EngineeringUnits" DataType="EUInformation" AccessLevel="1" UserAccessLevel="1" ParentNodeId="ns=2;s=Pluviometro.Precipitaciones_mm_h">
+    <DisplayName>EngineeringUnits</DisplayName>
+    <Description>Unidades de la acumulación de precipitaciones</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=68</Reference> <!-- PropertyType -->
+    </References>
+    <Value>
+      <ExtensionObject>
+        <TypeId>
+          <Identifier>i=887</Identifier>
+        </TypeId>
+        <Body>
+          <EUInformation xmlns="http://opcfoundation.org/UA/2008/02/Types.xsd">
+            <NamespaceUri>http://www.opcfoundation.org/UA/units/un/cefact</NamespaceUri>
+            <UnitId>4408652</UnitId>
+            <DisplayName>
+              <Text>mm</Text>
+            </DisplayName>
+            <Description>
+              <Text>Milímetros acumulados</Text>
+            </Description>
+          </EUInformation>
+        </Body>
+      </ExtensionObject>
+    </Value>
+  </UAVariable>
+  <!-- Instancia del pluviómetro -->
+  <UAObject NodeId="ns=2;s=Pluviometro" BrowseName="2:Pluviometro">
+    <DisplayName>Pluviometro</DisplayName>
+    <Description>Objeto que representa el pluviómetro</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">ns=2;s=PluviometroType</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+    </References>
+  </UAObject>
 </UANodeSet>
