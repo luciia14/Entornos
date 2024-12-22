@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<UANodeSet xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- Espacio de nombres -->
+  <NamespaceUris>
+    <Uri>http://www.epsa.upv.es/entornos</Uri>
+  </NamespaceUris>
+
+  <!-- Objeto principal del pluviómetro -->
+  <UAObject NodeId="ns=2;s=Pluviometro" BrowseName="2:Pluviometro">
+    <DisplayName>Pluviometro</DisplayName>
+    <Description>Objeto que representa el pluviómetro</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=58</Reference> <!-- BaseObjectType -->
+      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+    </References>
+  </UAObject>
+
+  <!-- Variable Precipitaciones -->
+  <UAVariable NodeId="ns=2;s=Precipitaciones" BrowseName="2:Precipitaciones" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Precipitaciones</DisplayName>
+    <Description>Valor actual de precipitaciones en mm/h</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+
+  <!-- Variable Hora -->
+  <UAVariable NodeId="ns=2;s=Hora" BrowseName="2:Hora" DataType="DateTime" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Hora</DisplayName>
+    <Description>Hora actual simulada</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
+    </References>
+    <Value>
+      <DateTime>2024-01-01T00:00:00Z</DateTime>
+    </Value>
+  </UAVariable>
+
+  <!-- Variable Precipitaciones_mm_h -->
+  <UAVariable NodeId="ns=2;s=Precipitaciones_mm_h" BrowseName="2:Precipitaciones_mm_h" DataType="Double" AccessLevel="3" UserAccessLevel="3">
+    <DisplayName>Precipitaciones_mm_h</DisplayName>
+    <Description>Acumulación de precipitaciones en mm</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference> <!-- BaseDataVariableType -->
+      <Reference ReferenceType="Organizes" IsForward="false">ns=2;s=Pluviometro</Reference>
+    </References>
+    <Value>
+      <Double>0.0</Double>
+    </Value>
+  </UAVariable>
+</UANodeSet>
